@@ -1,5 +1,5 @@
 const { ethers } = require("ethers");
-const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
 
@@ -23,8 +23,8 @@ export default async function handler(req, res) {
       return res.status(501).json({ error: "Missing ALCHEMY_URL" });
     }
 
-    if (!process.env.SECRET) {
-      return res.status(502).json({ error: "Missing SECRET" });
+    if (!process.env.PRIVATE_KEY) {
+      return res.status(502).json({ error: "Missing LICENSE_PRIVATE_KEY" });
     }
 
     if (!process.env.CONTRACT_ADDRESS) {
@@ -32,8 +32,6 @@ export default async function handler(req, res) {
     }
 
     const provider = new ethers.JsonRpcProvider(process.env.ALCHEMY_URL);
-
-    const ethBalance = await provider.getBalance(wallet);
 
     const contract = new ethers.Contract(
       CONTRACT_ADDRESS,
@@ -54,7 +52,7 @@ export default async function handler(req, res) {
       secs
     ] = await contract.balanceOf(wallet);
 
-    // 🔒 FULL VALIDATION LOGIC
+    // 🔒 FULL VALIDATION LOGIC (unchanged)
     const now = Math.floor(Date.now() / 1000);
 
     const valid =
@@ -65,51 +63,30 @@ export default async function handler(req, res) {
     if (!valid) {
       return res.status(403).json({
         valid: false,
-        error: "License invalid, expired, or not licensed",
-        license: {
-          shareAmount: shareAmount.toString(),
-          isValid,
-          plan: Number(plan),
-          expiry: expiry.toString(),
-          licensed,
-          isLifetime,
-          daysRemaining: daysRemaining.toString(),
-          hrs: hrs.toString(),
-          mins: mins.toString(),
-          secs: secs.toString()
-        }
+        error: "License invalid, expired, or not licensed"
       });
     }
 
-    const token = jwt.sign(
-      {
-        wallet,
-        plan: Number(plan),
-        licensed: true
-      },
-      process.env.SECRET
-    );
+    // ✅ Build signed payload instead of JWT
+    const payload = {
+      wallet: wallet.toLowerCase(),
+      licensed: true,
+      isValid: true,
+      isLifetime: isLifetime,
+      expiry: isLifetime ? 9999999999 : Number(expiry),
+      plan: Number(plan),
+      issuedAt: now,
+      nonce: crypto.randomUUID()
+    };
 
-    return res.status(200).json({
-      valid: true,
-      wallet,
-      balance: ethers.formatEther(ethBalance),
+    // Sign with your private key
+    const privateKey = process.env.PRIVATE_KEY.replace(/\\n/g, '\n');
+    const sign = crypto.createSign("SHA256");
+    sign.update(JSON.stringify(payload));
+    sign.end();
+    const signature = sign.sign(privateKey, "base64");
 
-      license: {
-        shareAmount: shareAmount.toString(),
-        isValid,
-        plan: Number(plan),
-        expiry: expiry.toString(),
-        licensed,
-        isLifetime,
-        daysRemaining: daysRemaining.toString(),
-        hrs: hrs.toString(),
-        mins: mins.toString(),
-        secs: secs.toString()
-      },
-
-      token
-    });
+    return res.status(200).json({ payload, signature });
 
   } catch (err) {
     console.error("ERROR:", err);

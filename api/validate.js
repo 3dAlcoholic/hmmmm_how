@@ -81,10 +81,8 @@ export default async function handler(req, res) {
 
     // Sign with your private key
     const privateKey = process.env.PRIVATE_KEY.replace(/\\n/g, '\n');
-    const sign = crypto.createSign("SHA256");
-    sign.update(JSON.stringify(payload));
-    sign.end();
-    const signature = sign.sign(privateKey, "base64");
+    const sign = crypto.sign(null, Buffer.from(JSON.stringify(payload)), privateKey);
+    const signature = sign.toString("base64");
 
     return res.status(200).json({ payload, signature });
 

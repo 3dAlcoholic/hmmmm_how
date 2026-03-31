@@ -1,0 +1,16 @@
+{
+  "name": "license-server",
+  "version": "1.0.0",
+  "description": "License validation server",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ethers": "^6.16.0",
+    "jsonwebtoken": "^9.0.3"
+  }
+}
